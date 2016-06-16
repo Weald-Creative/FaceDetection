@@ -10,6 +10,7 @@ import Foundation
 import CoreImage
 
 class FaceObscurationFilter : CIFilter {
+    
     let inputImage: CIImage
     
     init(inputImage: CIImage) {

@@ -10,6 +10,7 @@ import Foundation
 import CoreImage
 
 struct PixellationFilter : Filter {
+    
     let inputImage: CIImage
     var inputFactor: CGFloat
     var inputCenter: CIVector
