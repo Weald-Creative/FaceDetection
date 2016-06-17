@@ -23,6 +23,7 @@ class FaceObscurationFilter : CIFilter {
     }
     
     override var outputImage: CIImage? {
+        
         // Detect any faces in the image
         let detector = CIDetector(ofType: CIDetectorTypeFace, context:nil, options:nil)
         let features = detector.featuresInImage(inputImage)
@@ -32,7 +33,7 @@ class FaceObscurationFilter : CIFilter {
             return inputImage
         }
         
-        print("Features: \(features)")
+//        print("Features: \(features)")
         
         // Build a pixellated version of the image using the CIPixellate filter
         guard let pixellatedImage = PixellationFilter(inputImage: inputImage).outputImage else {
@@ -46,13 +47,14 @@ class FaceObscurationFilter : CIFilter {
             // Get feature position and radius for circle
             let xCenter = feature.bounds.origin.x + feature.bounds.size.width / 2.0
             let yCenter = feature.bounds.origin.y + feature.bounds.size.height / 2.0
-            let radius = min(feature.bounds.size.width, feature.bounds.size.height) / 1.5
+            
+            let radius = min(feature.bounds.size.width, feature.bounds.size.height) / 2.0
             
             // Input parameters for the circle filter
             var circleOptions: [String: AnyObject] = [:]
             circleOptions["inputRadius0"] = radius
             circleOptions["inputRadius1"] = radius + 1
-            circleOptions["inputColor0"] = CIColor(red: 0, green: 1, blue: 0, alpha: 1)
+            circleOptions["inputColor0"] = CIColor(red: 1, green: 1, blue: 1, alpha: 1)
             circleOptions["inputColor1"] = CIColor(red: 0, green: 0, blue: 0, alpha: 1)
             circleOptions[kCIInputCenterKey] = CIVector(x: xCenter, y: yCenter)
             
@@ -64,18 +66,22 @@ class FaceObscurationFilter : CIFilter {
                 continue
             }
             
-            guard let image = maskImage else {
-                // Mask image is not set - so remember it for composition next time.
+            if maskImage == nil {
+                
                 maskImage = circleImage
-                continue
             }
+            
+            let image = maskImage
             
             // If the mask image is already set, create a composite of both the
             // new circle image and the old so we're creating one image with all
             // of the circles in it.
-            let options: [String: AnyObject] = [kCIInputImageKey: circleImage, kCIInputBackgroundImageKey: image]
+            let options: [String: AnyObject] = [kCIInputImageKey: circleImage, kCIInputBackgroundImageKey: image!]
             let composition = CIFilter(name: "CISourceOverCompositing", withInputParameters: options)!
             maskImage = composition.outputImage
+            
+            // Need to crop the maskImage to the inputImage size
+            maskImage = maskImage?.imageByCroppingToRect(inputImage.extent)
         }
         
         // Create a single blended image made up of the pixellated image, the mask image, and the original image.
@@ -83,16 +89,20 @@ class FaceObscurationFilter : CIFilter {
         // the original image in the background.
         // We use the CIBlendWithMask filter for this, and set the background image as the original image,
         // the input image (the one to be masked) as the pixellated image, and the mask image as, well, the mask.
+        let sourceImage = inputImage
         var blendOptions: [String: AnyObject] = [:]
         blendOptions[kCIInputImageKey] = pixellatedImage
-        blendOptions[kCIInputBackgroundImageKey] = inputImage
+        blendOptions[kCIInputBackgroundImageKey] = sourceImage
         blendOptions[kCIInputMaskImageKey] = maskImage
         
         guard let blend = CIFilter(name: "CIBlendWithMask", withInputParameters: blendOptions) else {
+            
             return nil
         }
         
+        let returnImage = blend.outputImage
+        
         // Finally, set the resulting image as the output
-        return blend.outputImage
+        return returnImage
     }
 }
